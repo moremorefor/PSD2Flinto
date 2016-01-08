@@ -26,6 +26,7 @@ app.bringToFront();
 #include "js/json2.js"
 #include "js/xorshift.js"
 #include "js/uuid.js"
+#include "js/polyfill.js"
 
 preferences.rulerUnits = Units.PIXELS;
 
@@ -50,6 +51,20 @@ var docFolder;
 
 var clippingGroups = [];
 var _clippingGroup = [];
+
+var ADJUSTMENT_LAYERS = [
+    LayerKind.BRIGHTNESSCONTRAST,
+    LayerKind.CHANNELMIXER,
+    LayerKind.COLORBALANCE,
+    LayerKind.CURVES,
+    LayerKind.GRADIENTMAP,
+    LayerKind.HUESATURATION,
+    LayerKind.INVERSION,
+    LayerKind.LEVELS,
+    LayerKind.POSTERIZE,
+    LayerKind.SELECTIVECOLOR,
+    LayerKind.THRESHOLD
+];
 
 main();
 
@@ -141,6 +156,11 @@ function preprocess_layer(layer) {
         _clippingGroup.push(layer);
         clippingGroups.push(_clippingGroup);
         _clippingGroup = [];
+    }
+
+    // adjustment layer
+    if (!layer.grouped && ADJUSTMENT_LAYERS.indexOf(layer.kind) > -1) {
+        layer.visible = false;
     }
 }
 
