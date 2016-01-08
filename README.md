@@ -14,6 +14,7 @@ For more information, please visit [here](http://www.adobe.com/devnet/photoshop/
 
 ## 3rd party libraries
 - [json2.js](https://github.com/douglascrockford/JSON-js)
+- [node-uuid](https://github.com/broofa/node-uuid)
 
 ## Settings
 This script supports one scale factor now.  

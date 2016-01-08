@@ -1,11 +1,13 @@
-﻿ //
+ //
 // Copyright (c) 2015 more_more_for
 //
 
 #target photoshop
 app.bringToFront();
 
-#include "json2.js"
+#include "js/json2.js"
+#include "js/xorshift.js"
+#include "js/uuid.js"
 
 preferences.rulerUnits = Units.PIXELS;
 
@@ -67,7 +69,7 @@ function main() {
 function process_doc() {
   metadata_doc["x"] = 0;
   metadata_doc["y"] = 0;
-  metadata_doc["id"] = uuid();
+  metadata_doc["id"] = UUID.generate();
   metadata_doc["name"] = documentName;
   metadata_doc["layers"] = [];
 
@@ -188,7 +190,7 @@ function generate_metadata(layer) {
   var h = parseInt(layObj[3] - layObj[1], 10);
   var centerX = parseInt(x + w / 2, 10);
   var centerY = parseInt(y + h / 2, 10);
-  var id = uuid();
+  var id = UUID.generate();
   var layerInfo = {
     "x": centerX,
     "y": centerY,
@@ -220,23 +222,6 @@ function unlockLayer(layer) {
 function convertToSmartObject() {
   var idnewPlacedLayer = stringIDToTypeID("newPlacedLayer");
   executeAction(idnewPlacedLayer, undefined, DialogModes.NO);
-}
-
-///////////////////////////////////////////////////////////////////////////////
-// UUID
-///////////////////////////////////////////////////////////////////////////////
-function uuid() {
-  var uuid = "",
-    i, random;
-  for (i = 0; i < 32; i++) {
-    random = Math.random() * 16 | 0;
-
-    if (i == 8 || i == 12 || i == 16 || i == 20) {
-      uuid += "-";
-    }
-    uuid += (i == 12 ? 4 : (i == 16 ? (random & 3 | 8) : random)).toString(16);
-  }
-  return uuid.toUpperCase();
 }
 
 ///////////////////////////////////////////////////////////////////////////////
