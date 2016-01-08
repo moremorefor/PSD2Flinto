@@ -48,6 +48,9 @@ var folder;
 var exportFolder;
 var docFolder;
 
+var clippingGroups = [];
+var _clippingGroup = [];
+
 main();
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -100,20 +103,91 @@ function process_doc() {
   var originDoc = d;
   d = d.duplicate();
   var layers = d.layers;
+  preprocess_layers(layers);
+  apply_preprocess();
   process_layers(layers, metadata_doc["layers"]);
   d.close(SaveOptions.DONOTSAVECHANGES);
   d = originDoc;
 }
 
+///////////////////////////////////////////////////////////////////////////////
+// Preprocess
+///////////////////////////////////////////////////////////////////////////////
+
+function preprocess_layers(layers) {
+    // From top
+    for (var i = 0; i < layers.length; i++) {
+        var layer = layers[i];
+        if (!layer.visible) continue;
+
+        switch(layer.typename) {
+            case "LayerSet":
+                preprocess_layers(layer.layers);
+                break;
+            case "ArtLayer":
+                preprocess_layer(layer)
+                break;
+            default:
+                break;
+        }
+    }
+}
+
+function preprocess_layer(layer) {
+    // clipping mask
+    if (layer.grouped) {
+        _clippingGroup.push(layer);
+    } else if (_clippingGroup.length > 0) {
+        _clippingGroup.push(layer);
+        clippingGroups.push(_clippingGroup);
+        _clippingGroup = [];
+    }
+}
+
+function apply_preprocess() {
+    for (var i = 0; i < clippingGroups.length; i++) {
+        var clippingGroup = clippingGroups[i];
+        mergeClippingMasks(clippingGroup)
+    }
+}
+
+function mergeClippingMasks(layers) {
+    // Some kind of layer does not be supported 'merge'.
+    // So, it will convert to a normal layer.
+    var bottomLayer = layers[layers.length-1];
+    activeDocument.activeLayer = bottomLayer;
+    convertToSmartObject();
+    rasterizeLayer();
+
+    // From bottom
+    for (var i = layers.length-1; i >= 0; i--) {
+        if (i != layers.length-1) {
+            var layer = layers[i];
+            activeDocument.activeLayer = layer;
+            layer.merge();
+        }
+    }
+}
+
+///////////////////////////////////////////////////////////////////////////////
+// Process
+///////////////////////////////////////////////////////////////////////////////
+
 function process_layers(layers, metadata) {
+  // From bottom
   for (var i = layers.length - 1; i >= 0; i--) {
     var layer = layers[i];
-    if (layer.typename == "LayerSet") {
-      if (layer.visible) process_layerSet(layer, metadata);
-    } else if (layer.typename == "ArtLayer") {
-      if (layer.visible) process_artLayer(layer, metadata);
-    } else {
-      // $.writeln("not found");
+    if (!layer.visible) continue;
+
+    switch(layer.typename) {
+        case "LayerSet":
+            process_layerSet(layer, metadata);
+            break;
+        case "ArtLayer":
+            process_artLayer(layer, metadata);
+            break;
+        default:
+            break;
     }
   }
 }
