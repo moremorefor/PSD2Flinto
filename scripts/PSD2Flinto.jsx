@@ -34,7 +34,6 @@ preferences.rulerUnits = Units.PIXELS;
 // Settings
 ///////////////////////////////////////////////////////////////////////////////
 var alwaysOverwrite = false;
-var scaleFactor = 2.0;
 
 ///////////////////////////////////////////////////////////////////////////////
 // Variables
@@ -66,12 +65,15 @@ var ADJUSTMENT_LAYERS = [
     LayerKind.THRESHOLD
 ];
 
-main();
-
 ///////////////////////////////////////////////////////////////////////////////
 // Main
 ///////////////////////////////////////////////////////////////////////////////
-function main() {
+function run() {
+  var dialog = new Dialog(d);
+  dialog.show();
+}
+
+function main(scale, resolution, pixelDensity) {
   try {
     touchUpLayerSelection();
   } catch (e) {}
@@ -89,10 +91,10 @@ function main() {
 
   documentName = file.name.split(".")[0];
 
-  process_doc();
-  metadata["width"] = parseInt(d.width, 10);
-  metadata["height"] = parseInt(d.height, 10);
-  metadata["scale"] = scaleFactor;
+  process_doc(scale);
+  metadata["width"] = resolution["width"];
+  metadata["height"] = resolution["height"];
+  metadata["scale"] = pixelDensity;
   metadata["screens"] = [metadata_doc];
 
   json = JSON.stringify(metadata, null, "\t");
@@ -102,7 +104,7 @@ function main() {
   execFile.execute();
 }
 
-function process_doc() {
+function process_doc(scale) {
   metadata_doc["x"] = 0;
   metadata_doc["y"] = 0;
   metadata_doc["id"] = UUID.generate();
@@ -117,6 +119,9 @@ function process_doc() {
 
   var originDoc = d;
   d = d.duplicate();
+  var w = parseInt(d.width, 10) * scale;
+  var h = parseInt(d.height, 10) * scale;
+  d.resizeImage(w, h, d.resolution, ResampleMethod.BICUBIC);
   var layers = d.layers;
   preprocess_layers(layers);
   apply_preprocess();
@@ -440,6 +445,214 @@ function writeToFile(txt, savePath) {
   }
 }
 
+///////////////////////////////////////////////////////////////////////////////
+// GUI
+///////////////////////////////////////////////////////////////////////////////
+var Dialog = function(doc) {
+  this.scaleList = [
+    "50%",
+    "100%",
+    "150%",
+    "200%",
+    "300%"
+  ];
+
+  this.scaleFactorIndexs = [3, 4, 3, 3, 3, 3, 1];
+
+  this.deviceList = [
+    "iPhone 6",
+    "iPhone 6 Plus",
+    "iPhone (4 inch)",
+    "iPad",
+    "Apple Watch (42mm)",
+    "Apple Watch (38mm)",
+    "Custom"
+  ];
+  this.resolutions = [
+    {width: 750,  height: 1334}, // iPhone 6
+    {width: 1242, height: 2208}, // iPhone 6 Plus
+    {width: 640,  height: 1136}, // iPhone 4 inch
+    {width: 2048, height: 1536}, // iPad Retina
+    {width: 312,  height: 390}, // Apple Watch 42mm
+    {width: 272,  height: 460} // Apple Watch 38mm
+  ];
+
+  this.deviceSelectedIndex = 6;
+  var suggestedScaleFactor = 1.0;
+
+  this.isLandscape = false;
+
+  var docW = parseInt(doc.width, 10);
+  var docH = parseInt(doc.height, 10);
+  this.initialSize = {
+    width: docW,
+    height: docH
+  };
+
+  this.dialog = new Window('dialog', 'PSD2Flinto', [0, 0, 420, 310]);
+  this.setupWindow();
+
+  for (var index = 0; index < this.resolutions.length; index++) {
+    var resolution = this.resolutions[index]
+    if (docW == resolution.width || docW * 2 == resolution.width || docW * 3 == resolution.width) {
+      this.deviceSelectedIndex = index;
+      suggestedScaleFactor = resolution.width / docW;
+      this.initialSize = {
+        width: (resolution.width / suggestedScaleFactor),
+        height: (resolution.height / suggestedScaleFactor)
+      };
+      break;
+    }
+    if (docW == resolution.height || docW * 2 == resolution.height || docW * 3 == resolution.height) {
+      this.isLandscape = true;
+      this.deviceSelectedIndex = index;
+      suggestedScaleFactor = resolution.height / docW;
+      this.initialSize = {
+        width: (resolution.width / suggestedScaleFactor),
+        height: (resolution.height / suggestedScaleFactor)
+      };
+      break;
+    }
+  }
+
+  this.dialog.deviceList.selection = this.deviceSelectedIndex;
+
+  var scaleFactorIndex = 1;
+  if (suggestedScaleFactor != 1) {
+    scaleFactorIndex = this.scaleFactorIndexs[this.deviceSelectedIndex]
+  }
+  this.dialog.scaleList.selection = scaleFactorIndex;
+  this.scaleFactor = parseFloat(this.dialog.scaleList.selection.toString().replace(/[^0-9]/g, "")) / 100;
+
+  this.updateSizeTextField();
+};
+
+Dialog.prototype.setupWindow = function() {
+  var self = this;
+  var dlg = this.dialog;
+
+  // Title
+  dlg.labelHeadline = dlg.add('statictext', [102, 18, 323, 43], 'Export as Flinto Document', {
+    multiline: true
+  });
+  dlg.labelHeadline.graphics.font = ScriptUI.newFont("Helvetica", ScriptUI.FontStyle.BOLD, 16);
+
+  // ScaleList
+  dlg.labelScale = dlg.add('statictext', [35, 77, 131, 102], ' Scale', {
+    multiline: true
+  });
+  dlg.labelScale.graphics.font = ScriptUI.newFont("Helvetica", ScriptUI.FontStyle.BOLD, 14);
+  dlg.labelScale.justify = "right";
+  dlg.scaleList = dlg.add('dropdownlist', [140, 71, 315, 96], this.scaleList);
+  dlg.scaleList.selection = 1;
+
+  dlg.scaleList.onChange = function() {
+    self.updateSizeTextField();
+  };
+
+  // DeviceList
+  dlg.labelDevice = dlg.add('statictext', [35, 125, 131, 150], 'Device Size', {
+    multiline: true
+  });
+  dlg.labelDevice.graphics.font = ScriptUI.newFont("Helvetica", ScriptUI.FontStyle.BOLD, 14);
+  dlg.labelDevice.justify = "right";
+  dlg.deviceList = dlg.add('dropdownlist', [140, 119, 315, 144], this.deviceList);
+  dlg.deviceList.selection = 0;
+
+  dlg.deviceList.onChange = function() {
+    var idx = dlg.deviceList.selection.index;
+    if (idx < 6) {
+      var r = self.resolutions[idx];
+      var s = parseFloat(dlg.scaleList.selection.toString().replace(/[^0-9]/g, "")) / 100;
+      self.initialSize.width = r.width / s;
+      self.initialSize.height = r.height / s;
+      self.updateSizeTextField();
+    }
+  };
+
+  // Size
+  dlg.deviceWidth = dlg.add('edittext', [140, 170, 233, 192]);
+  dlg.deviceWidth.text = this.resolutions[0]["width"];
+  dlg.deviceWidth.justify = "center";
+
+  dlg.deviceHeight = dlg.add('edittext', [248, 170, 340, 192]);
+  dlg.deviceHeight.text = this.resolutions[0]["height"];
+  dlg.deviceHeight.justify = "center";
+
+  dlg.labelDeviceWidth = dlg.add('statictext', [140, 202, 233, 228], 'Width', {
+    multiline: true
+  });
+  dlg.labelDeviceWidth.graphics.font = ScriptUI.newFont("Helvetica", ScriptUI.FontStyle.REGULAR, 14);
+  dlg.labelDeviceWidth.justify = "center";
+
+  dlg.labelDeviceHeight = dlg.add('statictext', [248, 202, 340, 228], 'Height', {
+    multiline: true
+  });
+  dlg.labelDeviceHeight.graphics.font = ScriptUI.newFont("Helvetica", ScriptUI.FontStyle.REGULAR, 14);
+  dlg.labelDeviceHeight.justify = "center";
+
+  // Button
+  dlg.btnCancel = dlg.add('button', [140, 252, 249, 279], 'cancel');
+  dlg.btnSave = dlg.add('button', [260, 252, 369, 279], 'Save');
+
+  dlg.btnSave.onClick = function() {
+    var _scale = dlg.scaleList.selection;
+    var scale = parseFloat(_scale.toString().replace(/[^0-9]/g, "")) / 100;
+
+    var pixelDensity = 1.0;
+    var deviceType = dlg.deviceList.selection;
+    if (deviceType != 6) {
+      pixelDensity = deviceType == 1 ? 3.0 : 2.0;
+    }
+
+    var _width = parseFloat(dlg.deviceWidth.text);
+    if (!_width || _width <= 0) {
+      alert("Please enter a valid width.");
+      return;
+    }
+
+    var _height = parseFloat(dlg.deviceHeight.text);
+    if (!_height || _height <= 0) {
+      alert("Please enter a valid height.");
+      return;
+    }
+
+    var resolution = {
+      width: _width,
+      height: _height
+    };
+
+    dlg.close();
+
+    main(scale, resolution, pixelDensity);
+  };
+
+  dlg.center();
+};
+
+Dialog.prototype.updateSizeTextField = function() {
+  var dlg = this.dialog;
+  var index = dlg.deviceList.selection.index;
+
+  var r = this.initialSize;
+  var w = r.width;
+  var h = r.height;
+
+  if (this.isLandscape) {
+    var tmp = w;
+    w = h;
+    h = tmp;
+  }
+
+  var s = parseFloat(dlg.scaleList.selection.toString().replace(/[^0-9]/g, "")) / 100;
+  dlg.deviceWidth.text = w * s;
+  dlg.deviceHeight.text = h * s;
+};
+
+Dialog.prototype.show = function() {
+  this.dialog.show();
+};
+
 
 /* ===================================================
 // c2008 Adobe Systems, Inc. All rights reserved.
@@ -577,3 +790,5 @@ function rasterizeLayer() {
     // do nothing
   }
 }
+
+run();
