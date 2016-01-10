@@ -16,23 +16,20 @@ For more information, please visit [here](http://www.adobe.com/devnet/photoshop/
 - [json2.js](https://github.com/douglascrockford/JSON-js)
 - [node-uuid](https://github.com/broofa/node-uuid)
 
-## Settings
-This script supports one scale factor now.  
-If you want to change scale factor, change this variable.
-```
-var scaleFactor = 2.0;
-```
-
 ## Tested environment
 - Mac OSX Yosemite
 - Photoshop CC, CC2014, CC2015
 
 ## To-do
-- Performance improvement
-- Export settings in the panel
-- Support image rotation
-- Support layer lock
-- Change to the CEP plugin
+- [ ] Performance improvement
+- [x] Export settings panel
+- [x] Support clipping mask
+- [ ] Support layer style
+- [ ] Support layer comp
+- [ ] Support artboard
+- [ ] Support image rotation
+- [ ] Support layer lock
+- [ ] Change to the CEP plugin
 
 
 ## License
