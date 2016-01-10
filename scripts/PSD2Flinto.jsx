@@ -52,17 +52,17 @@ var clippingGroups = [];
 var _clippingGroup = [];
 
 var ADJUSTMENT_LAYERS = [
-    LayerKind.BRIGHTNESSCONTRAST,
-    LayerKind.CHANNELMIXER,
-    LayerKind.COLORBALANCE,
-    LayerKind.CURVES,
-    LayerKind.GRADIENTMAP,
-    LayerKind.HUESATURATION,
-    LayerKind.INVERSION,
-    LayerKind.LEVELS,
-    LayerKind.POSTERIZE,
-    LayerKind.SELECTIVECOLOR,
-    LayerKind.THRESHOLD
+  LayerKind.BRIGHTNESSCONTRAST,
+  LayerKind.CHANNELMIXER,
+  LayerKind.COLORBALANCE,
+  LayerKind.CURVES,
+  LayerKind.GRADIENTMAP,
+  LayerKind.HUESATURATION,
+  LayerKind.INVERSION,
+  LayerKind.LEVELS,
+  LayerKind.POSTERIZE,
+  LayerKind.SELECTIVECOLOR,
+  LayerKind.THRESHOLD
 ];
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -135,63 +135,63 @@ function process_doc(scale) {
 ///////////////////////////////////////////////////////////////////////////////
 
 function preprocess_layers(layers) {
-    // From top
-    for (var i = 0; i < layers.length; i++) {
-        var layer = layers[i];
-        if (!layer.visible) continue;
+  // From top
+  for (var i = 0; i < layers.length; i++) {
+    var layer = layers[i];
+    if (!layer.visible) continue;
 
-        switch(layer.typename) {
-            case "LayerSet":
-                preprocess_layers(layer.layers);
-                break;
-            case "ArtLayer":
-                preprocess_layer(layer)
-                break;
-            default:
-                break;
-        }
+    switch (layer.typename) {
+      case "LayerSet":
+        preprocess_layers(layer.layers);
+        break;
+      case "ArtLayer":
+        preprocess_layer(layer);
+        break;
+      default:
+        break;
     }
+  }
 }
 
 function preprocess_layer(layer) {
-    // clipping mask
-    if (layer.grouped) {
-        _clippingGroup.push(layer);
-    } else if (_clippingGroup.length > 0) {
-        _clippingGroup.push(layer);
-        clippingGroups.push(_clippingGroup);
-        _clippingGroup = [];
-    }
+  // clipping mask
+  if (layer.grouped) {
+    _clippingGroup.push(layer);
+  } else if (_clippingGroup.length > 0) {
+    _clippingGroup.push(layer);
+    clippingGroups.push(_clippingGroup);
+    _clippingGroup = [];
+  }
 
-    // adjustment layer
-    if (!layer.grouped && ADJUSTMENT_LAYERS.indexOf(layer.kind) > -1) {
-        layer.visible = false;
-    }
+  // adjustment layer
+  if (!layer.grouped && ADJUSTMENT_LAYERS.indexOf(layer.kind) > -1) {
+    layer.visible = false;
+  }
 }
 
 function apply_preprocess() {
-    for (var i = 0; i < clippingGroups.length; i++) {
-        var clippingGroup = clippingGroups[i];
-        mergeClippingMasks(clippingGroup)
-    }
+  for (var i = 0; i < clippingGroups.length; i++) {
+    var clippingGroup = clippingGroups[i];
+    mergeClippingMasks(clippingGroup);
+  }
 }
 
 function mergeClippingMasks(layers) {
-    // Some kind of layer does not be supported 'merge'.
-    // So, it will convert to a normal layer.
-    var bottomLayer = layers[layers.length-1];
-    activeDocument.activeLayer = bottomLayer;
-    convertToSmartObject();
-    rasterizeLayer();
+  // Some kind of layer does not be supported 'merge'.
+  // So, it will convert to a normal layer.
+  var bottomLayer = layers[layers.length - 1];
+  activeDocument.activeLayer = bottomLayer;
+  convertToSmartObject();
+  rasterizeLayer();
 
-    // From bottom
-    for (var i = layers.length-1; i >= 0; i--) {
-        if (i != layers.length-1) {
-            var layer = layers[i];
-            activeDocument.activeLayer = layer;
-            layer.merge();
-        }
+  // From bottom
+  for (var i = layers.length - 1; i >= 0; i--) {
+    if (i != layers.length - 1) {
+      var layer = layers[i];
+      activeDocument.activeLayer = layer;
+      layer.merge();
     }
+  }
 }
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -204,15 +204,15 @@ function process_layers(layers, metadata) {
     var layer = layers[i];
     if (!layer.visible) continue;
 
-    switch(layer.typename) {
-        case "LayerSet":
-            process_layerSet(layer, metadata);
-            break;
-        case "ArtLayer":
-            process_artLayer(layer, metadata);
-            break;
-        default:
-            break;
+    switch (layer.typename) {
+      case "LayerSet":
+        process_layerSet(layer, metadata);
+        break;
+      case "ArtLayer":
+        process_artLayer(layer, metadata);
+        break;
+      default:
+        break;
     }
   }
 }
@@ -493,7 +493,7 @@ var Dialog = function(doc) {
   this.setupWindow();
 
   for (var index = 0; index < this.resolutions.length; index++) {
-    var resolution = this.resolutions[index]
+    var resolution = this.resolutions[index];
     if (docW == resolution.width || docW * 2 == resolution.width || docW * 3 == resolution.width) {
       this.deviceSelectedIndex = index;
       suggestedScaleFactor = resolution.width / docW;
@@ -519,7 +519,7 @@ var Dialog = function(doc) {
 
   var scaleFactorIndex = 1;
   if (suggestedScaleFactor != 1) {
-    scaleFactorIndex = this.scaleFactorIndexs[this.deviceSelectedIndex]
+    scaleFactorIndex = this.scaleFactorIndexs[this.deviceSelectedIndex];
   }
   this.dialog.scaleList.selection = scaleFactorIndex;
   this.scaleFactor = parseFloat(this.dialog.scaleList.selection.toString().replace(/[^0-9]/g, "")) / 100;
