@@ -43,6 +43,7 @@ var documentName;
 var metadata = {};
 var metadata_doc = {};
 var metadata_layers;
+var historySnapshot;
 
 var folder;
 var exportFolder;
@@ -119,12 +120,15 @@ function process_doc(scale) {
 
   var originDoc = d;
   d = d.duplicate();
-  var w = parseInt(d.width, 10) * scale;
-  var h = parseInt(d.height, 10) * scale;
-  d.resizeImage(w, h, d.resolution, ResampleMethod.BICUBIC);
+  if (scale != 1) {
+    var w = parseInt(d.width, 10) * scale;
+    var h = parseInt(d.height, 10) * scale;
+    d.resizeImage(w, h, d.resolution, ResampleMethod.BICUBIC);
+  }
   var layers = d.layers;
   preprocess_layers(layers);
   apply_preprocess();
+  historySnapshot = createSnapshot();
   process_layers(layers, metadata_doc["layers"]);
   d.close(SaveOptions.DONOTSAVECHANGES);
   d = originDoc;
@@ -258,30 +262,24 @@ function process_artLayer(layer, metadata) {
 }
 
 function exportLayer(targetLayer, metadata) {
-  var newDocName = "_export.psd";
-  var newDoc = documents.add(d.width, d.height, 72.0, newDocName, NewDocumentMode.RGB, DocumentFill.TRANSPARENT);
-  activeDocument = d;
-  targetLayer.duplicate(newDoc, ElementPlacement.PLACEATBEGINNING);
-  activeDocument = newDoc;
-  var layer = newDoc.activeLayer;
+  hideAllOtherLayers();
 
   // metadata
-  var data = generate_metadata(layer);
+  var data = generate_metadata(targetLayer);
   data["type"] = "image";
   metadata.push(data);
 
   // trim
-  newDoc.trim(TrimType.TRANSPARENT);
+  d.trim(TrimType.TRANSPARENT);
 
   // export
   var webFile = new File(docFolder + "/" + data["id"] + ".png");
   var webOpt = new ExportOptionsSaveForWeb();
   webOpt.format = SaveDocumentType.PNG;
   webOpt.PNG8 = false;
-  newDoc.exportDocument(webFile, ExportType.SAVEFORWEB, webOpt);
-  newDoc.close(SaveOptions.DONOTSAVECHANGES);
+  d.exportDocument(webFile, ExportType.SAVEFORWEB, webOpt);
 
-  activeDocument = d;
+  revertHistorySate(historySnapshot);
 }
 
 function process_vectorMask() {
@@ -336,9 +334,55 @@ function unlockLayer(layer) {
   if (layer.allLocked) layer.allLocked = false;
 }
 
+function hideAllOtherLayers() {
+  var idShw = charIDToTypeID( "Shw " );
+      var desc13 = new ActionDescriptor();
+      var idnull = charIDToTypeID( "null" );
+          var list9 = new ActionList();
+              var ref11 = new ActionReference();
+              var idLyr = charIDToTypeID( "Lyr " );
+              var idOrdn = charIDToTypeID( "Ordn" );
+              var idTrgt = charIDToTypeID( "Trgt" );
+              ref11.putEnumerated( idLyr, idOrdn, idTrgt );
+          list9.putReference( ref11 );
+      desc13.putList( idnull, list9 );
+      var idTglO = charIDToTypeID( "TglO" );
+      desc13.putBoolean( idTglO, true );
+  executeAction( idShw, desc13, DialogModes.NO );
+}
+
 function convertToSmartObject() {
   var idnewPlacedLayer = stringIDToTypeID("newPlacedLayer");
   executeAction(idnewPlacedLayer, undefined, DialogModes.NO);
+}
+
+function createSnapshot() {
+  var idMk = charIDToTypeID( "Mk  " );
+      var desc14 = new ActionDescriptor();
+      var idnull = charIDToTypeID( "null" );
+          var ref10 = new ActionReference();
+          var idSnpS = charIDToTypeID( "SnpS" );
+          ref10.putClass( idSnpS );
+      desc14.putReference( idnull, ref10 );
+      var idFrom = charIDToTypeID( "From" );
+          var ref11 = new ActionReference();
+          var idHstS = charIDToTypeID( "HstS" );
+          var idCrnH = charIDToTypeID( "CrnH" );
+          ref11.putProperty( idHstS, idCrnH );
+      desc14.putReference( idFrom, ref11 );
+  executeAction( idMk, desc14, DialogModes.NO );
+
+  var historyStates = d.historyStates;
+  for (var i = historyStates.length-1; i >= 0; i--) {
+    if (historyStates[i].snapshot) {
+      return historyStates[i];
+    }
+  }
+  return false;
+}
+
+function revertHistorySate(historyState) {
+  d.activeHistoryState = historyState;
 }
 
 ///////////////////////////////////////////////////////////////////////////////
