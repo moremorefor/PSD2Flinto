@@ -637,7 +637,7 @@ Dialog.prototype.setupWindow = function() {
 
   // Button
   dlg.btnCancel = dlg.add('button', [140, 252, 249, 279], 'cancel');
-  dlg.btnSave = dlg.add('button', [260, 252, 369, 279], 'Save');
+  dlg.btnSave = dlg.add('button', [260, 252, 369, 279], 'OK');
 
   dlg.btnSave.onClick = function() {
     var _scale = dlg.scaleList.selection;
