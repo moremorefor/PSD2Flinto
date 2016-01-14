@@ -38,7 +38,7 @@ var alwaysOverwrite = false;
 ///////////////////////////////////////////////////////////////////////////////
 // Variables
 ///////////////////////////////////////////////////////////////////////////////
-var d = activeDocument;
+var d;
 var documentName;
 var metadata = {};
 var metadata_doc = {};
@@ -842,4 +842,9 @@ function rasterizeLayer() {
   }
 }
 
-run();
+if (app.documents.length === 0) {
+  alert("Document not found.");
+} else {
+  d = activeDocument;
+  run();
+}
