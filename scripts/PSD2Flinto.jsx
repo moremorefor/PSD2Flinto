@@ -70,6 +70,13 @@ var ADJUSTMENT_LAYERS = [
 // Main
 ///////////////////////////////////////////////////////////////////////////////
 function run() {
+  try {
+    var documentPath = d.path;
+  } catch (e) {
+    alert("Document is not saved.\nPlease save this document.");
+    return;
+  }
+
   var dialog = new Dialog(d);
   dialog.show();
 }
