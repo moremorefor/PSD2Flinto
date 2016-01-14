@@ -149,11 +149,9 @@ function preprocess_layers(layers) {
   // From top
   for (var i = 0; i < layers.length; i++) {
     var layer = layers[i];
-    if (!layer.visible) continue;
-
     switch (layer.typename) {
       case "LayerSet":
-        preprocess_layers(layer.layers);
+        if (layer.visible) preprocess_layers(layer.layers);
         break;
       case "ArtLayer":
         preprocess_layer(layer);
@@ -191,6 +189,11 @@ function mergeClippingMasks(layers) {
   // Some kind of layer does not be supported 'merge'.
   // So, it will convert to a normal layer.
   var bottomLayer = layers[layers.length - 1];
+  var bottomVisibility = true;
+  if (!bottomLayer.visible) {
+    bottomVisibility = false;
+    bottomLayer.visible = true;
+  }
   activeDocument.activeLayer = bottomLayer;
   convertToSmartObject();
   rasterizeLayer();
@@ -199,10 +202,15 @@ function mergeClippingMasks(layers) {
   for (var i = layers.length - 1; i >= 0; i--) {
     if (i != layers.length - 1) {
       var layer = layers[i];
-      activeDocument.activeLayer = layer;
-      layer.merge();
+      if (layer.visible) {
+        layer.merge();
+      } else {
+        layer.remove();
+      }
     }
   }
+
+  if (!bottomVisibility) activeDocument.activeLayer.visible = false;
 }
 
 ///////////////////////////////////////////////////////////////////////////////
