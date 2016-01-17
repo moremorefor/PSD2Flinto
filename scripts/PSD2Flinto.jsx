@@ -241,15 +241,10 @@ function process_layerSet(layerSet, metadata) {
   unlockLayer(layerSet);
 
   var recursiveFlag = true;
-  if (hasVectorMask()) {
+  if (hasVectorMask() || hasLayerMask() || hasLayerStyle(layerSet)) {
     recursiveFlag = false;
-    process_vectorMask();
+    flatten();
   }
-  if (hasLayerMask()) {
-    recursiveFlag = false;
-    process_layerMask();
-  }
-  //if ( hasFilterMask() )
 
   if (recursiveFlag) {
     var data = generate_metadata(layerSet);
@@ -268,10 +263,7 @@ function process_artLayer(layer, metadata) {
   d.activeLayer = layer;
   unlockLayer(layer);
 
-  if (hasVectorMask()) process_vectorMask();
-  if (hasLayerMask()) process_layerMask();
-  if (layer.kind == LayerKind.TEXT) process_textLayer();
-  //if ( hasFilterMask() )
+  if (hasVectorMask() || hasLayerMask() || hasLayerStyle(layer) || isTextLayer(layer)) flatten();
 
   exportLayer(d.activeLayer, metadata);
 }
@@ -295,21 +287,6 @@ function exportLayer(targetLayer, metadata) {
   d.exportDocument(webFile, ExportType.SAVEFORWEB, webOpt);
 
   revertHistorySate(historySnapshot);
-}
-
-function process_vectorMask() {
-  convertToSmartObject();
-  rasterizeLayer();
-}
-
-function process_layerMask() {
-  convertToSmartObject();
-  rasterizeLayer();
-}
-
-function process_textLayer() {
-  convertToSmartObject();
-  rasterizeLayer();
 }
 
 function generate_metadata(layer) {
@@ -338,6 +315,40 @@ function generate_metadata(layer) {
 ///////////////////////////////////////////////////////////////////////////////
 // Utils
 ///////////////////////////////////////////////////////////////////////////////
+function isPropEnabled(obj, key) {
+  if (key in obj) {
+    if (obj[key].enabled) return true;
+  }
+  return false;
+}
+
+function flatten() {
+  convertToSmartObject();
+  rasterizeLayer();
+}
+
+function hasLayerStyle(layer) {
+  var styles = getLayerStylesObject(layer);
+  if (isPropEnabled(styles, "dropShadow") ||
+    isPropEnabled(styles, "innerShadow") ||
+    isPropEnabled(styles, "outerGlow") ||
+    isPropEnabled(styles, "innerGlow") ||
+    isPropEnabled(styles, "bevelEmboss") ||
+    isPropEnabled(styles, "chromeFX") ||
+    isPropEnabled(styles, "solidFill") ||
+    isPropEnabled(styles, "gradientFill") ||
+    isPropEnabled(styles, "patternFill") ||
+    isPropEnabled(styles, "frameFX")) {
+    return true;
+  }
+  return false;
+}
+
+function isTextLayer(layer) {
+  if (layer.kind == LayerKind.TEXT) return true;
+  return false;
+}
+
 function unlockLayer(layer) {
   if (layer.isBackgroundLayer) layer.isBackgroundLayer = false;
   if (layer.positionLocked) layer.positionLocked = false;
@@ -850,6 +861,98 @@ function rasterizeLayer() {
   }
 }
 
+
+///////////////////////////////////////////////////////////////////////////////
+// ExportLayerStyle.jsx
+// https://github.com/tomkrcha/LayerMiner
+///////////////////////////////////////////////////////////////////////////////
+function getLayerStylesObject(layer) {
+  var preLayer = app.activeDocument.activeLayer;
+  app.activeDocument.activeLayer = layer;
+  var obj = getLayerStyles();
+  if (obj == null) {
+    // alert("No style to assigned to the selected layer.");
+    obj = {};
+  }
+
+  app.activeDocument.activeLayer = preLayer;
+
+  return obj;
+}
+
+// Available LayerStyle properties: frameFX, solidFill, gradientFill, chromeFX, bevelEmboss, innerGlow, outerGlow, innerShadow, dropShadow.opacity/distance
+function getLayerStyles() {
+  var ref = new ActionReference();
+  ref.putEnumerated(charIDToTypeID("Lyr "), charIDToTypeID("Ordn"), charIDToTypeID("Trgt"));
+  var layerDesc = executeActionGet(ref);
+  if (layerDesc.hasKey(stringIDToTypeID('layerEffects'))) {
+    stylesDesc = layerDesc.getObjectValue(stringIDToTypeID('layerEffects'));
+    var obj = actionDescriptorToObject(stylesDesc);
+    return obj;
+  }
+};
+
+function actionDescriptorToObject(desc) {
+  var obj = {};
+  var len = desc.count;
+  for (var i = 0; i < len; i++) {
+    var key = desc.getKey(i);
+    obj[typeIDToStringID(key)] = getValueByType(desc, key);
+  }
+  return obj;
+}
+// Get a value from an ActionDescriptor by a type defined by a key
+// ALIASTYPE BOOLEANTYPE CLASSTYPE DOUBLETYPE ENUMERATEDTYPE INTEGERTYPE LARGEINTEGERTYPE LISTTYPE OBJECTTYPE RAWTYPE REFERENCETYPE STRINGTYPE UNITDOUBLE
+function getValueByType(desc, key) {
+  var type = desc.getType(key);
+  var value = null;
+  switch (type) {
+    case DescValueType.ALIASTYPE:
+      value = "alias";
+      break;
+    case DescValueType.BOOLEANTYPE:
+      value = desc.getBoolean(key);
+      break;
+    case DescValueType.CLASSTYPE:
+      value = desc.getClass(key);
+      break;
+    case DescValueType.OBJECTTYPE:
+      value = actionDescriptorToObject(desc.getObjectValue(key)); //+" - "+desc.getObjectType(key);
+      break;
+    case DescValueType.ENUMERATEDTYPE:
+      value = typeIDToStringID(desc.getEnumerationValue(key));
+      break;
+    case DescValueType.DOUBLETYPE:
+      value = desc.getDouble(key);
+      break;
+    case DescValueType.INTEGERTYPE:
+      value = desc.getInteger(key);
+      break;
+    case DescValueType.LARGEINTEGERTYPE:
+      value = desc.getLargeInteger(key);
+      break;
+    case DescValueType.LISTTYPE:
+      value = desc.getList(key);
+      break;
+    case DescValueType.RAWTYPE:
+      // not implemented
+      break;
+    case DescValueType.REFERENCETYPE:
+      value = desc.getReference(key);
+      break;
+    case DescValueType.STRINGTYPE:
+      value = desc.getString(key);
+      break;
+    case DescValueType.UNITDOUBLE:
+      value = desc.getUnitDoubleValue(key);
+      break;
+  }
+  return value;
+}
+
+///////////////////////////////////////////////////////////////////////////////
+// Start
+///////////////////////////////////////////////////////////////////////////////
 if (app.documents.length === 0) {
   alert("Document not found.");
 } else {
