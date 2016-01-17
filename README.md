@@ -21,10 +21,10 @@ For more information, please visit [here](http://www.adobe.com/devnet/photoshop/
 - Photoshop CC, CC2014, CC2015
 
 ## To-do
-- [ ] Performance improvement
+- [x] Performance improvement
 - [x] Export settings panel
 - [x] Support clipping mask
-- [ ] Support layer style
+- [x] Support layer style
 - [ ] Support layer comp
 - [ ] Support artboard
 - [ ] Support image rotation
