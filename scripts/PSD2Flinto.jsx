@@ -39,10 +39,10 @@ var alwaysOverwrite = false;
 // Variables
 ///////////////////////////////////////////////////////////////////////////////
 var d;
-var documentName;
-var metadata = {};
-var metadata_doc = {};
-var metadata_layers;
+var metadata = {
+  screens: []
+};
+var metadata_screens = metadata["screens"];
 var historySnapshot;
 
 var folder;
@@ -66,6 +66,13 @@ var ADJUSTMENT_LAYERS = [
   LayerKind.THRESHOLD
 ];
 
+var ExportDocument = {
+    LASTDODUMENTSTATE:   0,
+    SELECTEDLAYERCOMPS: 1,
+    ALLLAYERCOMP:  2,
+};
+
+
 ///////////////////////////////////////////////////////////////////////////////
 // Main
 ///////////////////////////////////////////////////////////////////////////////
@@ -81,7 +88,7 @@ function run() {
   dialog.show();
 }
 
-function main(scale, resolution, pixelDensity) {
+function main(scale, resolution, pixelDensity, exportType) {
   try {
     touchUpLayerSelection();
   } catch (e) {}
@@ -97,13 +104,59 @@ function main(scale, resolution, pixelDensity) {
     return;
   }
 
-  documentName = file.name.split(".")[0];
+  var originDoc = d;
+  d = d.duplicate();
 
-  process_doc(scale);
+  var w = parseInt(d.width, 10);
+  var h = parseInt(d.height, 10);
+  if (scale != 1) {
+    w = parseInt(d.width, 10) * scale;
+    h = parseInt(d.height, 10) * scale;
+    d.resizeImage(w, h, d.resolution, ResampleMethod.BICUBIC);
+  }
+
+  // ExportDocument
+  switch(exportType) {
+    case ExportDocument.LASTDODUMENTSTATE:
+      var docName = decodeURIComponent(file.name.split(".")[0]);
+      process_doc(w, h, docName, 0);
+      break;
+    case ExportDocument.SELECTEDLAYERCOMPS:
+      var layerComps = d.layerComps;
+      var count = 0;
+      for (var i = 0; i < layerComps.length; i++) {
+        var comp = layerComps[i];
+        if (comp.selected) {
+          comp.apply();
+          deleteInvisibledLayers();
+          var docName = decodeURIComponent(comp.name);
+          process_doc(w, h, docName, count);
+          revertStartSnapshot();
+          count++;
+        }
+      }
+      break;
+    case ExportDocument.ALLLAYERCOMP:
+      var layerComps = d.layerComps;
+      for (var i = 0; i < layerComps.length; i++) {
+        var comp = layerComps[i];
+        comp.apply();
+        deleteInvisibledLayers();
+        var docName = decodeURIComponent(comp.name);
+        process_doc(w, h, docName, i);
+        revertStartSnapshot();
+      }
+      break;
+    default:
+      break;
+  }
+
+  d.close(SaveOptions.DONOTSAVECHANGES);
+  d = originDoc;
+
   metadata["width"] = resolution["width"];
   metadata["height"] = resolution["height"];
   metadata["scale"] = pixelDensity;
-  metadata["screens"] = [metadata_doc];
 
   json = JSON.stringify(metadata, null, "\t");
   writeToFile(json, exportFolder.fsName + "/metadata.json");
@@ -112,11 +165,12 @@ function main(scale, resolution, pixelDensity) {
   execFile.execute();
 }
 
-function process_doc(scale) {
-  metadata_doc["x"] = 0;
-  metadata_doc["y"] = 0;
+function process_doc(width, height, docName, num) {
+  var metadata_doc = {};
+  metadata_doc["x"] = 0 + (width + 60) * (num % 3);
+  metadata_doc["y"] = 0 + (height + 160) * parseInt(num / 3, 10);
   metadata_doc["id"] = UUID.generate();
-  metadata_doc["name"] = documentName;
+  metadata_doc["name"] = docName;
   metadata_doc["layers"] = [];
 
   docFolder = new Folder(exportFolder + "/" + metadata_doc["id"]);
@@ -125,20 +179,13 @@ function process_doc(scale) {
     return;
   }
 
-  var originDoc = d;
-  d = d.duplicate();
-  if (scale != 1) {
-    var w = parseInt(d.width, 10) * scale;
-    var h = parseInt(d.height, 10) * scale;
-    d.resizeImage(w, h, d.resolution, ResampleMethod.BICUBIC);
-  }
   var layers = d.layers;
   preprocess_layers(layers);
   apply_preprocess();
   historySnapshot = createSnapshot();
   process_layers(layers, metadata_doc["layers"]);
-  d.close(SaveOptions.DONOTSAVECHANGES);
-  d = originDoc;
+  metadata_screens.push(metadata_doc);
+
 }
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -377,6 +424,19 @@ function hideAllOtherLayers() {
   executeAction( idShw, desc13, DialogModes.NO );
 }
 
+function deleteInvisibledLayers() {
+  var idDlt = charIDToTypeID( "Dlt " );
+    var desc29 = new ActionDescriptor();
+    var idnull = charIDToTypeID( "null" );
+        var ref16 = new ActionReference();
+        var idLyr = charIDToTypeID( "Lyr " );
+        var idOrdn = charIDToTypeID( "Ordn" );
+        var idhidden = stringIDToTypeID( "hidden" );
+        ref16.putEnumerated( idLyr, idOrdn, idhidden );
+    desc29.putReference( idnull, ref16 );
+  executeAction( idDlt, desc29, DialogModes.NO );
+}
+
 function convertToSmartObject() {
   var idnewPlacedLayer = stringIDToTypeID("newPlacedLayer");
   executeAction(idnewPlacedLayer, undefined, DialogModes.NO);
@@ -409,6 +469,17 @@ function createSnapshot() {
 
 function revertHistorySate(historyState) {
   d.activeHistoryState = historyState;
+}
+
+function revertStartSnapshot() {
+  var idslct = charIDToTypeID( "slct" );
+    var desc7 = new ActionDescriptor();
+    var idnull = charIDToTypeID( "null" );
+        var ref5 = new ActionReference();
+        var idSnpS = charIDToTypeID( "SnpS" );
+        ref5.putName( idSnpS, activeDocument.name );
+    desc7.putReference( idnull, ref5 );
+  executeAction( idslct, desc7, DialogModes.NO );
 }
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -547,6 +618,12 @@ var Dialog = function(doc) {
     {width: 272,  height: 460} // Apple Watch 38mm
   ];
 
+  this.exportList = [
+    "Last Document State",
+    "Selected Layer Comps",
+    "All Layer Comps"
+  ];
+
   this.deviceSelectedIndex = 6;
   var suggestedScaleFactor = 1.0;
 
@@ -559,9 +636,10 @@ var Dialog = function(doc) {
     height: docH
   };
 
-  this.dialog = new Window('dialog', 'PSD2Flinto', [0, 0, 420, 310]);
+  this.dialog = new Window('dialog', 'PSD2Flinto', [0, 0, 420, 350]);
   this.setupWindow();
 
+  // Device
   for (var index = 0; index < this.resolutions.length; index++) {
     var resolution = this.resolutions[index];
     if (docW == resolution.width || docW * 2 == resolution.width || docW * 3 == resolution.width) {
@@ -584,9 +662,9 @@ var Dialog = function(doc) {
       break;
     }
   }
-
   this.dialog.deviceList.selection = this.deviceSelectedIndex;
 
+  // Scale
   var scaleFactorIndex = 1;
   if (suggestedScaleFactor != 1) {
     scaleFactorIndex = this.scaleFactorIndexs[this.deviceSelectedIndex];
@@ -594,7 +672,16 @@ var Dialog = function(doc) {
   this.dialog.scaleList.selection = scaleFactorIndex;
   this.scaleFactor = parseFloat(this.dialog.scaleList.selection.toString().replace(/[^0-9]/g, "")) / 100;
 
+  // Text
   this.updateSizeTextField();
+
+  // Export
+  var layerComps = d.layerComps;
+  var layerCompSelected = false;
+  for (var i = 0; i < layerComps.length; i++) {
+    if (layerComps[i].selected) layerCompSelected = true;
+  }
+  this.dialog.exportList.selection = layerCompSelected ? ExportDocument.SELECTEDLAYERCOMPS : ExportDocument.LASTDODUMENTSTATE;
 };
 
 Dialog.prototype.setupWindow = function() {
@@ -661,9 +748,15 @@ Dialog.prototype.setupWindow = function() {
   dlg.labelDeviceHeight.graphics.font = ScriptUI.newFont("Helvetica", ScriptUI.FontStyle.REGULAR, 14);
   dlg.labelDeviceHeight.justify = "center";
 
+  // Export
+  dlg.labelExport = dlg.add('statictext', [35,243,131,268] , 'Export', {multiline:true});
+  dlg.labelExport.graphics.font = ScriptUI.newFont("Helvetica", ScriptUI.FontStyle.BOLD, 14);
+  dlg.labelExport.justify = "right";
+  dlg.exportList = dlg.add('dropdownlist', [140,237,375,262], this.exportList);
+
   // Button
-  dlg.btnCancel = dlg.add('button', [140, 252, 249, 279], 'cancel');
-  dlg.btnSave = dlg.add('button', [260, 252, 369, 279], 'OK');
+  dlg.btnCancel = dlg.add('button', [140, 293, 249, 320], 'cancel');
+  dlg.btnSave = dlg.add('button', [260, 293, 369, 320], 'OK');
 
   dlg.btnSave.onClick = function() {
     var _scale = dlg.scaleList.selection;
@@ -692,12 +785,39 @@ Dialog.prototype.setupWindow = function() {
       height: _height
     };
 
+    var exportType = dlg.exportList.selection.index;
+
+    if (exportType > 0) {
+      var layerComps = d.layerComps;
+      if (layerComps.length === 0) {
+        alert("Document have no Layer Comp.\nPlease select the other export type.");
+        return;
+      }
+
+      if (exportType === ExportDocument.SELECTEDLAYERCOMPS) {
+        var layerCompSelected = false;
+        for (var i = 0; i < layerComps.length; i++) {
+          if (layerComps[i].selected) layerCompSelected = true;
+        }
+        if (!layerCompSelected) {
+          alert("Layer Comps are not selected.\nPlease select Layer Comps in Panel.");
+          return;
+        }
+      }
+    }
+
+    var progressPalette = new Window('palette', 'PSD2Flinto', [0, 0, 420, 100]);
+    progressPalette.label = progressPalette.add('statictext', [43,37,377,62] , 'Processing....', {multiline:true});
+    progressPalette.label.graphics.font = ScriptUI.newFont("Helvetica", ScriptUI.FontStyle.BOLD, 16);
+    progressPalette.label.justify = "center";
+    progressPalette.center();
+
     dlg.close();
+    progressPalette.show();
 
-    main(scale, resolution, pixelDensity);
+    main(scale, resolution, pixelDensity, exportType);
+    progressPalette.close();
   };
-
-  dlg.center();
 };
 
 Dialog.prototype.updateSizeTextField = function() {
@@ -720,6 +840,7 @@ Dialog.prototype.updateSizeTextField = function() {
 };
 
 Dialog.prototype.show = function() {
+  this.dialog.center();
   this.dialog.show();
 };
 
@@ -957,5 +1078,12 @@ if (app.documents.length === 0) {
   alert("Document not found.");
 } else {
   d = activeDocument;
-  run();
+
+  var historyStates = d.historyStates;
+  try {
+    historyStates.getByName(d.name);
+    run();
+  } catch(e) {
+    alert("Snapshot is not found.\nPlease open 'History options...' panel, and select this option.\n\n- Automatically Create First Snapshot\n\nThen, reopen this psd file.");
+  }
 }
