@@ -33,12 +33,14 @@ preferences.rulerUnits = Units.PIXELS;
 ///////////////////////////////////////////////////////////////////////////////
 // Settings
 ///////////////////////////////////////////////////////////////////////////////
-var alwaysOverwrite = false;
+var alwaysOverwrite = true;
+var scriptVersion = "1.3";
 
 ///////////////////////////////////////////////////////////////////////////////
 // Variables
 ///////////////////////////////////////////////////////////////////////////////
 var d;
+var docName;
 var metadata = {
   screens: []
 };
@@ -74,6 +76,110 @@ var ExportDocument = {
 
 
 ///////////////////////////////////////////////////////////////////////////////
+// Template
+///////////////////////////////////////////////////////////////////////////////
+var screenTemplate = [
+  {"category":"iOS",
+  "templates":[
+               {
+               "name":"iPhone 6",
+               "width":750,
+               "height":1334,
+               "density":2
+               },
+               {
+               "name":"iPhone 6 Plus",
+               "width":1242,
+               "height":2208,
+               "density":3
+               },
+               {
+               "name":"iPhone 5",
+               "width":640,
+               "height":1136,
+               "density":2
+               },
+               {
+               "name":"iPad",
+               "width":1536,
+               "height":2048,
+               "density":2
+               },
+               {
+               "name":"iPad Pro",
+               "width":2048,
+               "height":2732,
+               "density":2
+               },
+               {
+               "name":"Apple Watch (42mm)",
+               "width":312,
+               "height":390,
+               "density":2
+               },
+               {
+               "name":"Apple Watch (38mm)",
+               "width":272,
+               "height":240,
+               "density":2
+               },
+               {
+               "name":"Apple TV",
+               "width":1920,
+               "height":1080,
+               "density":1
+               },
+               ]
+  },
+  {"category":"Android",
+  "templates":[
+               {
+               "name":"Nexus 5X",
+               "width":1080,
+               "height":1920,
+               "density":1
+               },
+               {
+               "name":"Nexus 6P",
+               "width":1440,
+               "height":2560,
+               "density":1
+               },
+               {
+               "name":"Nexus 9",
+               "width":1536,
+               "height":2048,
+               "density":1
+               },
+               ]},
+  {"category":"Web",
+  "templates":[
+               {
+               "name":"1366 x 768",
+               "width":1366,
+               "height":768,
+               "density":1
+               },
+               {
+               "name":"1024 x 768",
+               "width":1024,
+               "height":768,
+               "density":1
+               },
+               {
+               "name":"1920 x 1080",
+               "width":1920,
+               "height":1080,
+               "density":1
+               },
+               ]},
+  ];
+var screenTemplateCustomIndex = 0;
+for(var i = 0; i < screenTemplate.length; i++) {
+  screenTemplateCustomIndex += screenTemplate[i]["templates"].length + 1;
+}
+
+///////////////////////////////////////////////////////////////////////////////
 // Main
 ///////////////////////////////////////////////////////////////////////////////
 function run() {
@@ -93,12 +199,8 @@ function main(scale, resolution, pixelDensity, exportType) {
     touchUpLayerSelection();
   } catch (e) {}
 
-  file = selectFolder(d.path, d.name.split(".")[0]);
-  if (!file) {
-    return;
-  }
-
-  exportFolder = new Folder(file.fsName);
+  docName = d.name.split(".")[0];
+  exportFolder = new Folder(Folder.temp + "/" + docName + ".flinto");
   var result = createFolder(exportFolder);
   if (!result) {
     return;
@@ -118,7 +220,7 @@ function main(scale, resolution, pixelDensity, exportType) {
   // ExportDocument
   switch(exportType) {
     case ExportDocument.LASTDODUMENTSTATE:
-      var docName = decodeURIComponent(file.name.split(".")[0]);
+      var docName = decodeURIComponent(docName);
       process_doc(w, h, docName, 0);
       break;
     case ExportDocument.SELECTEDLAYERCOMPS:
@@ -157,6 +259,8 @@ function main(scale, resolution, pixelDensity, exportType) {
   metadata["width"] = resolution["width"];
   metadata["height"] = resolution["height"];
   metadata["scale"] = pixelDensity;
+  metadata["id"] = UUID.generate();
+  metadata["version"] = scriptVersion;
 
   json = JSON.stringify(metadata, null, "\t");
   writeToFile(json, exportFolder.fsName + "/metadata.json");
@@ -504,23 +608,6 @@ function createFolder(folderObj) {
   return true;
 }
 
-function selectFolder(basepath, basename) {
-  var baseFile = new File(basepath + "/" + basename);
-  var fileObj = baseFile.saveDlg("Please input file name...");
-  if (!fileObj) {
-    alert("Canceled.");
-    return;
-  }
-
-  var overlapIdx = fileObj.name.indexOf(".flinto");
-  if (overlapIdx >= 0) {
-    return fileObj;
-  } else {
-    fileObj = new File(fileObj.fsName + ".flinto");
-    return fileObj;
-  }
-}
-
 function confirmOverWrite(folderObj) {
   var files = folderObj.getFiles();
   if (files.length > 0) {
@@ -598,25 +685,32 @@ var Dialog = function(doc) {
     "300%"
   ];
 
-  this.scaleFactorIndexs = [3, 4, 3, 3, 3, 3, 1];
+  this.scaleFactorIndexs = [1, 1, 3, 4];
 
-  this.deviceList = [
-    "iPhone 6",
-    "iPhone 6 Plus",
-    "iPhone (4 inch)",
-    "iPad",
-    "Apple Watch (42mm)",
-    "Apple Watch (38mm)",
-    "Custom"
-  ];
-  this.resolutions = [
-    {width: 750,  height: 1334}, // iPhone 6
-    {width: 1242, height: 2208}, // iPhone 6 Plus
-    {width: 640,  height: 1136}, // iPhone 4 inch
-    {width: 2048, height: 1536}, // iPad Retina
-    {width: 312,  height: 390}, // Apple Watch 42mm
-    {width: 272,  height: 460} // Apple Watch 38mm
-  ];
+  this.deviceList = [];
+  this.resolutions = [];
+  this.densityList = [];
+
+  for(var i = 0; i < screenTemplate.length; i++) {
+    for(var j = 0; j < screenTemplate[i]["templates"].length; j++){
+      var item = screenTemplate[i]["templates"][j];
+      this.deviceList.push(item["name"]);
+      this.resolutions.push({
+        width: item["width"],
+        height: item["height"]
+      });
+      this.densityList.push(item["density"]);
+    }
+
+    // separater
+    this.deviceList.push("-");
+    this.resolutions.push({
+      width: 0,
+      height: 0
+    });
+    this.densityList.push(0);
+  }
+  this.deviceList.push("Custom");
 
   this.exportList = [
     "Last Document State",
@@ -624,17 +718,14 @@ var Dialog = function(doc) {
     "All Layer Comps"
   ];
 
-  this.deviceSelectedIndex = 6;
+  this.deviceSelectedIndex = screenTemplateCustomIndex; // Custom
   var suggestedScaleFactor = 1.0;
 
   this.isLandscape = false;
 
   var docW = parseInt(doc.width, 10);
   var docH = parseInt(doc.height, 10);
-  this.initialSize = {
-    width: docW,
-    height: docH
-  };
+  this.initialSize = {width: docW, height: docH};
 
   this.dialog = new Window('dialog', 'PSD2Flinto', [0, 0, 420, 350]);
   this.setupWindow();
@@ -666,8 +757,11 @@ var Dialog = function(doc) {
 
   // Scale
   var scaleFactorIndex = 1;
-  if (suggestedScaleFactor != 1) {
-    scaleFactorIndex = this.scaleFactorIndexs[this.deviceSelectedIndex];
+  if (suggestedScaleFactor > 1) {
+    var index = parseInt(suggestedScaleFactor);
+    if (index < this.scaleFactorIndexs.length) {
+      scaleFactorIndex = this.scaleFactorIndexs[index];
+    }
   }
   this.dialog.scaleList.selection = scaleFactorIndex;
   this.scaleFactor = parseFloat(this.dialog.scaleList.selection.toString().replace(/[^0-9]/g, "")) / 100;
@@ -718,11 +812,11 @@ Dialog.prototype.setupWindow = function() {
 
   dlg.deviceList.onChange = function() {
     var idx = dlg.deviceList.selection.index;
-    if (idx < 6) {
+    if (idx < screenTemplateCustomIndex) { // Other than Custom
       var r = self.resolutions[idx];
-      var s = parseFloat(dlg.scaleList.selection.toString().replace(/[^0-9]/g, "")) / 100;
-      self.initialSize.width = r.width / s;
-      self.initialSize.height = r.height / s;
+      var scale = parseFloat(dlg.scaleList.selection.toString().replace(/[^0-9]/g, "")) / 100;
+      self.initialSize.width = r.width / scale;
+      self.initialSize.height = r.height / scale;
       self.updateSizeTextField();
     }
   };
@@ -763,9 +857,9 @@ Dialog.prototype.setupWindow = function() {
     var scale = parseFloat(_scale.toString().replace(/[^0-9]/g, "")) / 100;
 
     var pixelDensity = 1.0;
-    var deviceType = dlg.deviceList.selection;
-    if (deviceType != 6) {
-      pixelDensity = deviceType == 1 ? 3.0 : 2.0;
+    var deviceIdx = dlg.deviceList.selection.index;
+    if (deviceIdx != screenTemplateCustomIndex) { // Other than Custom
+      pixelDensity = self.densityList[deviceIdx];
     }
 
     var _width = parseFloat(dlg.deviceWidth.text);
@@ -815,6 +909,7 @@ Dialog.prototype.setupWindow = function() {
     dlg.close();
     progressPalette.show();
 
+    // $.writeln(resolution.width + "x" +  resolution.height + "@" + scale + "x " + pixelDensity);
     main(scale, resolution, pixelDensity, exportType);
     progressPalette.close();
   };
