@@ -2,7 +2,7 @@
 
 PSD2Flinto is Photoshop script to export the document as [Flinto for Mac](https://www.flinto.com/mac) document.
 
-_NOTE: This script supports Flinto for Mac version 1.2.x_
+_NOTE: This script supports Flinto for Mac version 1.3.x_
 
 ![PSD2Flinto](https://cloud.githubusercontent.com/assets/966109/12460324/8eb7ec52-bff6-11e5-872d-5d134d7806d4.png)
 
